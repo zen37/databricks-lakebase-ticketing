@@ -37,6 +37,9 @@ PRIORITIES = ["low", "normal", "high", "urgent"]
 MIN_TITLE_LEN = 15
 MIN_MESSAGE_LEN = 3
 
+# Statuses that count as "done" — mirrors the frontend CLOSED set.
+CLOSED_STATUSES = {"resolved", "closed", "canceled"}
+
 
 def _current_user_email() -> str:
     """
@@ -242,6 +245,57 @@ def update_status(ticket_id):
 def meta():
     """Expose the allowed statuses/priorities so the UI stays in sync."""
     return jsonify({"statuses": STATUSES, "priorities": PRIORITIES})
+
+
+@app.route("/stats", methods=["GET"])
+def stats():
+    """Aggregate counts for the dashboard view.
+
+    Everything here is derivable from the current schema in a handful of
+    GROUP BYs — no extra columns needed.
+    """
+    status_rows = lakebase.run_query(
+        "SELECT status, COUNT(*) AS n FROM tickets GROUP BY status"
+    )
+    priority_rows = lakebase.run_query(
+        "SELECT priority, COUNT(*) AS n FROM tickets GROUP BY priority"
+    )
+    message_rows = lakebase.run_query(
+        "SELECT COUNT(*) AS n FROM ticket_messages"
+    )
+    no_reply_rows = lakebase.run_query(
+        """
+        SELECT COUNT(*) AS n
+        FROM tickets t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ticket_messages m WHERE m.ticket_id = t.ticket_id
+        )
+        """
+    )
+
+    # Seed every known key at 0 so the UI has a stable shape.
+    by_status = {s: 0 for s in STATUSES}
+    for r in status_rows:
+        by_status[r["status"]] = r["n"]
+    by_priority = {p: 0 for p in PRIORITIES}
+    for r in priority_rows:
+        by_priority[r["priority"]] = r["n"]
+
+    total = sum(by_status.values())
+    open_backlog = sum(
+        n for s, n in by_status.items() if s not in CLOSED_STATUSES
+    )
+
+    return jsonify(
+        {
+            "total": total,
+            "open_backlog": open_backlog,
+            "by_status": by_status,
+            "by_priority": by_priority,
+            "total_messages": message_rows[0]["n"],
+            "tickets_without_reply": no_reply_rows[0]["n"],
+        }
+    )
 
 
 def _ticket_exists(ticket_id: int) -> bool:

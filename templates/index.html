@@ -70,11 +70,22 @@
     .toast.err { background: #fbe0e0; color: #b62b2b; border: 1px solid #eeb4b4; }
     .muted { color: var(--muted); }
     .inline { display: flex; gap: 8px; align-items: center; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px; margin-bottom: 22px; }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+    .stat .num { font-size: 28px; font-weight: 600; line-height: 1; }
+    .stat .lbl { color: var(--muted); font-size: 12px; text-transform: uppercase;
+      letter-spacing: .05em; margin-top: 8px; }
+    .breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .breakdown .item { display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+    .breakdown .item .c { font-weight: 600; }
+    header.top h1 { cursor: pointer; }
   </style>
 </head>
 <body>
   <header class="top">
-    <h1>Ticketing</h1>
+    <h1 id="home-link" title="Back to dashboard">Ticketing</h1>
     <span class="who">{{ email }}</span>
   </header>
 
@@ -246,6 +257,36 @@
       };
     }
 
+    async function renderStats() {
+      const s = await api("/stats");
+      const statusItems = state.statuses.map(st =>
+        `<div class="item"><span class="badge s-${st}">${st}</span>
+           <span class="c">${s.by_status[st] || 0}</span></div>`).join("");
+      const prioItems = state.priorities.map(p =>
+        `<div class="item"><span class="p-${p}">${esc(p)}</span>
+           <span class="c">${s.by_priority[p] || 0}</span></div>`).join("");
+      document.getElementById("detail").innerHTML = `
+        <h2>Overview</h2>
+        <div class="stats-grid">
+          <div class="stat"><div class="num">${s.total}</div><div class="lbl">Total tickets</div></div>
+          <div class="stat"><div class="num">${s.open_backlog}</div><div class="lbl">Open backlog</div></div>
+          <div class="stat"><div class="num">${s.total_messages}</div><div class="lbl">Messages</div></div>
+          <div class="stat"><div class="num">${s.tickets_without_reply}</div><div class="lbl">Awaiting first reply</div></div>
+        </div>
+        <h2>By status</h2>
+        <div class="breakdown">${statusItems}</div>
+        <h2>By priority</h2>
+        <div class="breakdown">${prioItems}</div>`;
+    }
+
+    function showDashboard() {
+      state.selected = null;
+      document.querySelectorAll("#ticket-list li").forEach(li => li.classList.remove("sel"));
+      renderStats().catch(e => toast(e.message, "err"));
+    }
+
+    document.getElementById("home-link").onclick = showDashboard;
+
     document.getElementById("t-create").onclick = async () => {
       const title = document.getElementById("t-title").value.trim();
       const priority = document.getElementById("t-priority").value;
@@ -263,7 +304,7 @@
     };
 
     (async () => {
-      try { await loadMeta(); await loadTickets(); }
+      try { await loadMeta(); await loadTickets(); await renderStats(); }
       catch (e) { toast(e.message, "err"); }
     })();
   </script>
