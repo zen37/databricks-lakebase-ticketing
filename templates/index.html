@@ -39,6 +39,7 @@
     .chip { padding: 3px 10px; border-radius: 999px; font-size: 12px; cursor: pointer;
       border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); }
     .chip.active { border-color: var(--accent); color: var(--accent); }
+    .chip-dash { font-weight: 500; margin-right: 6px; }
     .tickets { list-style: none; margin: 0; padding: 0; }
     .tickets li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px;
       margin-bottom: 8px; cursor: pointer; background: var(--panel); }
@@ -159,10 +160,14 @@
     function renderFilters() {
       const el = document.getElementById("filters");
       const chips = [["all", null], ...state.statuses.map(s => [s, s])];
-      el.innerHTML = chips.map(([label, val]) =>
+      const dash = `<span class="chip chip-dash ${state.selected === null ? "active" : ""}"
+        data-action="dashboard">&#8962; Dashboard</span>`;
+      const filterHtml = chips.map(([label, val]) =>
         `<span class="chip ${state.filter === val ? "active" : ""}" data-f="${val}">${label}</span>`
       ).join("");
+      el.innerHTML = dash + filterHtml;
       el.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+        if (c.dataset.action === "dashboard") { showDashboard(); return; }
         const v = c.dataset.f; state.filter = (v === "null") ? null : v;
         renderFilters(); loadTickets();
       });
@@ -190,6 +195,7 @@
 
     async function openTicket(id) {
       state.selected = id;
+      renderFilters();
       document.querySelectorAll("#ticket-list li").forEach(li =>
         li.classList.toggle("sel", Number(li.dataset.id) === id));
       const { ticket, messages } = await api("/tickets/" + id);
@@ -281,6 +287,7 @@
 
     function showDashboard() {
       state.selected = null;
+      renderFilters();
       document.querySelectorAll("#ticket-list li").forEach(li => li.classList.remove("sel"));
       renderStats().catch(e => toast(e.message, "err"));
     }
