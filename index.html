@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ticketing</title>
+  <style>
+    :root {
+      --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f0f2f5; --line: #d9dee6;
+      --text: #1a1f28; --muted: #67707e; --accent: #2b6de0; --accent-2: #1f57b8;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+      font: 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--accent); text-decoration: none; }
+    header.top { display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 22px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    header.top h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .02em; }
+    header.top .who { color: var(--muted); font-size: 12px; }
+    .layout { display: grid; grid-template-columns: 420px 1fr; gap: 0; height: calc(100vh - 55px); }
+    .col { overflow-y: auto; padding: 18px; }
+    .col.left { border-right: 1px solid var(--line); }
+    h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+      margin: 0 0 12px; font-weight: 600; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      padding: 14px; margin-bottom: 16px; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 4px; }
+    input[type=text], textarea, select {
+      width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+      border-radius: 6px; padding: 8px 10px; font: inherit; }
+    textarea { min-height: 70px; resize: vertical; }
+    .row { display: flex; gap: 10px; } .row > * { flex: 1; }
+    button { background: var(--accent); color: #fff; border: 0; padding: 8px 14px;
+      border-radius: 6px; font: inherit; font-weight: 500; cursor: pointer; }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    button:hover { background: var(--accent-2); }
+    button.secondary:hover { background: #e6e9ee; }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip { padding: 3px 10px; border-radius: 999px; font-size: 12px; cursor: pointer;
+      border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); }
+    .chip.active { border-color: var(--accent); color: var(--accent); }
+    .tickets { list-style: none; margin: 0; padding: 0; }
+    .tickets li { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px;
+      margin-bottom: 8px; cursor: pointer; background: var(--panel); }
+    .tickets li:hover { border-color: var(--accent); }
+    .tickets li.sel { border-color: var(--accent); background: var(--panel-2); }
+    .tickets li.done .title { opacity: .55; }
+    .tickets .rowline { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .tickets .title { font-weight: 500; }
+    .tickets .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+      font-weight: 500; white-space: nowrap; }
+    .s-open { background: #e1edff; color: #1c5bc4; }
+    .s-in_progress { background: #e6f4d9; color: #4a7a1c; }
+    .s-waiting { background: #fbf0d3; color: #96690c; }
+    .s-resolved { background: #d8f2e6; color: #1c7a56; }
+    .s-closed { background: #e9ebef; color: #5a6472; }
+    .s-canceled { background: #fbe0e0; color: #b62b2b; }
+    .p-low { color: #7a828f; } .p-normal { color: #3d4350; }
+    .p-high { color: #96690c; } .p-urgent { color: #c0392b; font-weight: 600; }
+    .msg { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 8px; }
+    .msg .meta { color: var(--muted); font-size: 11px; margin-bottom: 3px; }
+    .detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .detail-head h3 { margin: 0 0 6px; font-size: 16px; }
+    .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+    .toast { position: fixed; bottom: 18px; right: 18px; padding: 10px 14px; border-radius: 8px;
+      font-size: 13px; display: none; }
+    .toast.ok { background: #d8f2e6; color: #1c7a56; border: 1px solid #a9dcc5; }
+    .toast.err { background: #fbe0e0; color: #b62b2b; border: 1px solid #eeb4b4; }
+    .muted { color: var(--muted); }
+    .inline { display: flex; gap: 8px; align-items: center; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>Ticketing</h1>
+    <span class="who">{{ email }}</span>
+  </header>
+
+  <div class="layout">
+    <!-- LEFT: create + list -->
+    <div class="col left">
+      <div class="card">
+        <h2>New ticket</h2>
+        <label for="t-title">Title</label>
+        <input type="text" id="t-title" placeholder="Short summary">
+        <div class="row">
+          <div>
+            <label for="t-priority">Priority</label>
+            <select id="t-priority"></select>
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button id="t-create" style="width:100%;">Create</button>
+          </div>
+        </div>
+      </div>
+
+      <h2>Tickets</h2>
+      <div class="filters" id="filters"></div>
+      <ul class="tickets" id="ticket-list"></ul>
+    </div>
+
+    <!-- RIGHT: detail -->
+    <div class="col right" id="detail">
+      <div class="empty">Select a ticket, or create one.</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const state = { statuses: [], priorities: [], filter: null, selected: null };
+
+    const esc = (s) => (s == null ? "" : String(s).replace(/[&<>"']/g,
+      c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])));
+    const CLOSED = new Set(["resolved", "closed", "canceled"]);
+    const fmt = (iso) => {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return isNaN(d) ? iso : d.toLocaleString();
+    };
+
+    function toast(msg, kind = "ok") {
+      const t = document.getElementById("toast");
+      t.textContent = msg; t.className = "toast " + kind; t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 2600);
+    }
+
+    async function api(url, opts = {}) {
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json" }, ...opts,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      return data;
+    }
+
+    async function loadMeta() {
+      const m = await api("/meta");
+      state.statuses = m.statuses; state.priorities = m.priorities;
+      const sel = document.getElementById("t-priority");
+      sel.innerHTML = state.priorities
+        .map(p => `<option value="${p}" ${p === "normal" ? "selected" : ""}>${p}</option>`).join("");
+      renderFilters();
+    }
+
+    function renderFilters() {
+      const el = document.getElementById("filters");
+      const chips = [["all", null], ...state.statuses.map(s => [s, s])];
+      el.innerHTML = chips.map(([label, val]) =>
+        `<span class="chip ${state.filter === val ? "active" : ""}" data-f="${val}">${label}</span>`
+      ).join("");
+      el.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+        const v = c.dataset.f; state.filter = (v === "null") ? null : v;
+        renderFilters(); loadTickets();
+      });
+    }
+
+    async function loadTickets() {
+      const q = state.filter ? ("?status=" + encodeURIComponent(state.filter)) : "";
+      const rows = await api("/tickets" + q);
+      const ul = document.getElementById("ticket-list");
+      if (!rows.length) { ul.innerHTML = `<li class="muted" style="cursor:default;">No tickets.</li>`; return; }
+      ul.innerHTML = rows.map(t => `
+        <li data-id="${t.ticket_id}" class="${CLOSED.has(t.status) ? "done" : ""} ${state.selected === t.ticket_id ? "sel" : ""}">
+          <div class="rowline">
+            <span class="title">#${t.ticket_id} ${esc(t.title)}</span>
+            <span class="badge s-${t.status}">${t.status}</span>
+          </div>
+          <div class="sub">
+            <span class="p-${t.priority}">${t.priority}</span>
+            &middot; ${esc(t.created_by)} &middot; ${fmt(t.created_at)}
+          </div>
+        </li>`).join("");
+      ul.querySelectorAll("li[data-id]").forEach(li =>
+        li.onclick = () => openTicket(Number(li.dataset.id)));
+    }
+
+    async function openTicket(id) {
+      state.selected = id;
+      document.querySelectorAll("#ticket-list li").forEach(li =>
+        li.classList.toggle("sel", Number(li.dataset.id) === id));
+      const { ticket, messages } = await api("/tickets/" + id);
+      renderDetail(ticket, messages);
+    }
+
+    function renderDetail(t, messages) {
+      const statusOptions = state.statuses.map(s =>
+        `<option value="${s}" ${s === t.status ? "selected" : ""}>${s}</option>`).join("");
+      const msgHtml = messages.length
+        ? messages.map(m => `
+            <div class="msg">
+              <div class="meta">${esc(m.author)} &middot; ${fmt(m.created_at)}</div>
+              <div>${esc(m.message_text)}</div>
+            </div>`).join("")
+        : `<div class="muted">No messages yet.</div>`;
+
+      document.getElementById("detail").innerHTML = `
+        <div class="detail-head">
+          <div>
+            <h3>#${t.ticket_id} ${esc(t.title)}</h3>
+            <div class="muted">
+              <span class="badge s-${t.status}">${t.status}</span>
+              <span class="p-${t.priority}"> priority: ${t.priority}</span>
+              &middot; by ${esc(t.created_by)} &middot; ${fmt(t.created_at)}
+            </div>
+          </div>
+          <div class="inline">
+            <select id="d-status" style="width:auto;">${statusOptions}</select>
+            <button class="secondary" id="d-status-btn">Update</button>
+          </div>
+        </div>
+
+        <h2 style="margin-top:20px;">Conversation (${messages.length})</h2>
+        <div id="d-messages">${msgHtml}</div>
+
+        <div class="card" style="margin-top:14px;">
+          <label for="d-reply">Reply</label>
+          <textarea id="d-reply" placeholder="Write a reply..."></textarea>
+          <div style="margin-top:10px;"><button id="d-reply-btn">Add reply</button></div>
+        </div>`;
+
+      document.getElementById("d-status-btn").onclick = async () => {
+        const status = document.getElementById("d-status").value;
+        try {
+          await api(`/tickets/${t.ticket_id}/status`, {
+            method: "POST", body: JSON.stringify({ status }),
+          });
+          toast("Status set to " + status);
+          await loadTickets(); await openTicket(t.ticket_id);
+        } catch (e) { toast(e.message, "err"); }
+      };
+
+      document.getElementById("d-reply-btn").onclick = async () => {
+        const message_text = document.getElementById("d-reply").value.trim();
+        if (!message_text) { toast("Reply is empty", "err"); return; }
+        try {
+          await api(`/tickets/${t.ticket_id}/messages`, {
+            method: "POST", body: JSON.stringify({ message_text }),
+          });
+          toast("Reply added");
+          await openTicket(t.ticket_id);
+        } catch (e) { toast(e.message, "err"); }
+      };
+    }
+
+    document.getElementById("t-create").onclick = async () => {
+      const title = document.getElementById("t-title").value.trim();
+      const priority = document.getElementById("t-priority").value;
+      if (!title) { toast("Title is required", "err"); return; }
+      try {
+        const t = await api("/tickets", {
+          method: "POST", body: JSON.stringify({ title, priority }),
+        });
+        document.getElementById("t-title").value = "";
+        toast("Ticket #" + t.ticket_id + " created");
+        state.filter = null; renderFilters();
+        await loadTickets(); await openTicket(t.ticket_id);
+      } catch (e) { toast(e.message, "err"); }
+    };
+
+    (async () => {
+      try { await loadMeta(); await loadTickets(); }
+      catch (e) { toast(e.message, "err"); }
+    })();
+  </script>
+</body>
+</html>
