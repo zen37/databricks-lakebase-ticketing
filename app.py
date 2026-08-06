@@ -33,6 +33,10 @@ _w = WorkspaceClient()
 STATUSES = ["open", "in_progress", "waiting", "resolved", "closed", "canceled"]
 PRIORITIES = ["low", "normal", "high", "urgent"]
 
+# Minimum input lengths (also enforced client-side for immediate feedback).
+MIN_TITLE_LEN = 15
+MIN_MESSAGE_LEN = 3
+
 
 def _current_user_email() -> str:
     """
@@ -129,6 +133,13 @@ def create_ticket():
 
     if not title:
         return jsonify({"error": "title is required"}), 400
+    if len(title) < MIN_TITLE_LEN:
+        return (
+            jsonify(
+                {"error": f"title must be at least {MIN_TITLE_LEN} characters"}
+            ),
+            400,
+        )
     if priority not in PRIORITIES:
         return jsonify({"error": f"invalid priority: {priority!r}"}), 400
 
@@ -191,6 +202,13 @@ def add_message(ticket_id):
 
     if not text:
         return jsonify({"error": "message_text is required"}), 400
+    if len(text) < MIN_MESSAGE_LEN:
+        return (
+            jsonify(
+                {"error": f"message must be at least {MIN_MESSAGE_LEN} characters"}
+            ),
+            400,
+        )
 
     lakebase.run_write(
         """
