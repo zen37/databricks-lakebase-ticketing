@@ -22,5 +22,4 @@ Now that the core system works, the next step is to make it smarter and more pro
 
 **Accessibility**
 - Multi-language support for the UI and ticket content.
-
-The two I'd tackle first are the **status-change history (for SLA tracking)** and **authorization on status changes**, since they build directly on the current schema and turn this from a simple tracker into a real support workflow.
+  
